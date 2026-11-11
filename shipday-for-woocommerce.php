@@ -1,0 +1,99 @@
+<?php
+
+/*
+Plugin Name: Shipday Local Delivery for WooCommerce
+Plugin URI: https://www.shipday.com/woocommerce
+Version: 2.4.2
+Description: Enable fast local deliveries for your online store or marketplace with Shipday. Easy driver and dispatch app with live delivery tracking. Built-in connection with on-demand delivery services like DoorDash and Uber in the US.
+Author URI: https://www.shipday.com/
+Text Domain: shipday-for-woocommerce
+Domain Path: /languages
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Requires Plugins: woocommerce
+*/
+
+/** Prevent direct access */
+defined('ABSPATH') || exit;
+
+global $shipday_plugin_version;
+$shipday_plugin_version = '2.4.2';
+
+require_once dirname(__FILE__) . '/views/WCFM_vendor_settings_shipday.php';
+require_once dirname(__FILE__) . '/views/Dokan_vendor_settings_shipday.php';
+
+require_once dirname(__FILE__) . '/dispatch_post/post_fun.php';
+require_once dirname(__FILE__) . '/functions/common.php';
+require_once dirname(__FILE__) . '/functions/logger.php';
+
+require_once dirname(__FILE__) . '/rest_api/WooCommerce_REST_API.php';
+
+require_once dirname(__FILE__) . '/shipday_order_management/Shipday_Order_Management.php';
+require_once dirname(__FILE__) . '/shipday_order_management/Woo_Sync_Order.php';
+
+require_once dirname(__FILE__) . '/views/Notices.php';
+
+require_once dirname(__FILE__) . '/shipday-datetime/classic-checkout/Classic_Datetime.php';
+//require_once dirname(__FILE__) . '/shipday-datetime/block-checkout/Shipday_Delivery_Block.php';
+require_once dirname(__FILE__) . '/shipday-datetime/block-checkout/Shipday_Woo_Delivery_Block.php';
+require_once dirname(__FILE__) . '/shipday-datetime/block-checkout/Shipday_Woo_Delivery_Block_Storage.php';
+require_once dirname(__FILE__) . '/shipday-datetime/block-checkout/Shipday_Woo_DateTime_Util.php';
+
+require_once dirname(__FILE__) . '/shipday-delivery-fee/Shipday_Delivery_Fee.php';
+
+require_once dirname(__FILE__) . '/admin/Shipday_Menu_Settings.php';
+
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Legacy constant is referenced across the plugin codebase.
+define('WC_SHIPDAY_FILE', __FILE__);
+
+if (!defined('SHIPDAY_PLUGIN_DIR')) {
+	define('SHIPDAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
+}
+
+if (!defined('SHIPDAY_PLUGIN_URL')) {
+	define('SHIPDAY_PLUGIN_URL', plugin_dir_url(__FILE__));
+}
+
+// Register block-checkout hooks immediately so WooCommerce Blocks callbacks are
+// attached before WooCommerce fires `woocommerce_blocks_loaded`.
+Shipday_Woo_Delivery_Block::get_instance();
+
+function shipday_is_woocommerce_active() {
+	if ( class_exists( 'WooCommerce' ) ) {
+		return true;
+	}
+
+	if ( ! function_exists( 'is_plugin_active' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+
+	return function_exists( 'is_plugin_active' ) && is_plugin_active( 'woocommerce/woocommerce.php' );
+}
+
+function shipday_main() {
+	static $initialized = false;
+
+	if ( $initialized || ! shipday_is_woocommerce_active() ) {
+		return;
+	}
+
+	$initialized = true;
+
+	//WC_Settings_Tab_Shipday::init();
+	WCFM_vendor_settings_shipday::init();
+	Dokan_vendor_settings_shipday::init();
+	//WooCommerce_REST_API::init();
+	Shipday_Order_Management::init();
+	Woo_Sync_Order::init();
+	Notices::init();
+
+	Classic_Datetime::init();
+	Shipday_Woo_Delivery_Block_Storage::get_instance();
+	Shipday_Woo_DateTime_Util::get_instance();
+	Shipday_Delivery_Fee::init();
+	Shipday_Menu_Settings::initialize();
+}
+
+add_action( 'plugins_loaded', 'shipday_main', 20 );
+
+?>
